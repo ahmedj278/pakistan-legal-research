@@ -1,0 +1,51 @@
+# ---- Environment / secrets ----
+.env
+.env.local
+.env.*.local
+
+# ---- Node / React (backend, frontend) ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+.vite/
+
+# ---- Python (ai-service, ingestion) ----
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Databases / vector store / generated data ----
+# Raw judgment PDFs and processed data can be large and are not
+# meant to live in Git history. Keep the folder structure with a
+# .gitkeep-style README, but ignore actual data files.
+ingestion/data/raw/*
+ingestion/data/processed/*
+!ingestion/data/raw/.gitkeep
+!ingestion/data/processed/.gitkeep
+ai-service/chroma_data/
+*.sqlite3
+*.db
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# ---- Docker ----
+docker-compose.override.yml
