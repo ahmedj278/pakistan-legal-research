@@ -1,0 +1,83 @@
+# Development environment. Not tuned for production (see Module 8).
+#
+# Usage:
+#   cp .env.example .env      # if you haven't already
+#   docker compose up --build
+#
+# Services:
+#   postgres    -> localhost:5432
+#   backend     -> localhost:4000
+#   ai-service  -> localhost:8000
+#   frontend    -> localhost:5173
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-legal_research}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env
+    environment:
+      # Inside Docker's network, containers reach each other by
+      # service name, not "localhost" — these two overrides replace
+      # the localhost-based values from .env (which are correct for
+      # running the backend directly on your host instead).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-legal_research}
+      AI_SERVICE_URL: http://ai-service:8000
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ai-service:
+    build: ./ai-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./ai-service:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    environment:
+      # The browser calls this URL directly (it isn't inside the
+      # Docker network), so it must stay localhost, not "backend".
+      VITE_BACKEND_URL: http://localhost:4000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

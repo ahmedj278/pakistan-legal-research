@@ -82,9 +82,31 @@ detail.
 
 ## Getting started
 
-Not runnable yet — no application code exists. This will be filled
-in as the backend, AI service, and frontend are scaffolded
-(Module 1, Sessions 1.2–1.5).
+Requires [Docker](https://docs.docker.com/get-docker/) (with Compose
+included, as it is in current Docker Desktop).
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Then:
+
+| Service    | URL                          |
+|------------|-------------------------------|
+| Frontend   | http://localhost:5173         |
+| Backend    | http://localhost:4000/health  |
+| AI service | http://localhost:8000/health  |
+| Postgres   | localhost:5432                |
+
+Each service also has its own README with instructions for running
+it directly on your machine (without Docker) if you'd rather do
+that — see `backend/README.md`, `ai-service/README.md`, and
+`frontend/README.md`.
+
+No application functionality exists yet beyond health checks —
+Postgres isn't used by any code yet either (that starts in Module 2).
+This just proves the whole stack boots together.
 
 ## Roadmap
 
