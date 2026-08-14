@@ -4,8 +4,8 @@ Turns raw Pakistani court judgment PDFs into structured, extracted
 text ready for later processing (cleaning, metadata extraction,
 chunking — Sessions 2.3+).
 
-**Status:** Discovery + text extraction implemented (Module 2,
-Sessions 2.1–2.2).
+**Status:** Discovery, text extraction, and cleaning implemented
+(Module 2, Sessions 2.1–2.3).
 
 **Scope:** Supreme Court and Islamabad High Court only, for now.
 Balochistan HC and Peshawar HC (whose judgments are merged into
@@ -24,7 +24,9 @@ ingestion/
 │   ├── logger.py           shared structured logging setup
 │   ├── discovery.py        finds PDF files (Session 2.1)
 │   ├── extraction.py       extracts text from each PDF (Session 2.2)
-│   └── run_ingestion.py    entry point — runs discovery + extraction
+│   ├── cleaning.py         cleans/normalizes extracted text (Session 2.3)
+│   ├── run_ingestion.py    entry point — runs discovery + extraction
+│   └── run_cleaning.py      entry point — runs cleaning on already-extracted output
 ├── data/
 │   ├── raw/                 put/point your PDFs here (gitignored)
 │   │   ├── supreme_court/
@@ -55,12 +57,47 @@ INGESTION_SC_DIR=C:/path/to/your/supreme-court-pdfs
 INGESTION_IHC_DIR=C:/path/to/your/ihc-pdfs
 ```
 
-## Run
+## Run — extraction
 
 ```bash
 cd ingestion/src
 python run_ingestion.py       # Windows: py run_ingestion.py
 ```
+
+## Run — cleaning
+
+Once extraction has produced output in `data/processed/`, run:
+
+```bash
+cd ingestion/src
+python run_cleaning.py        # Windows: py run_cleaning.py
+```
+
+This reads the already-extracted JSON files and adds `cleaned_text`,
+`cleaned_char_count`, and `cleaning_status` to each one — no need to
+re-run the (slower) PDF extraction step to test a cleaning change.
+
+### What cleaning fixes
+
+Found by inspecting real extracted text, not guessed at:
+
+1. **Running page headers/footers** (e.g. `C.A. No. 3-L/2016 2`) get
+   extracted in the middle of sentences, since pdfplumber has no
+   concept of "this is a footer." Detected generically: lines that
+   share the same template (ignoring the trailing page number) and
+   repeat 2+ times across the document.
+2. **Footnote reference numbers glued onto words** (e.g. `Nabi.1`).
+   The footnote *text* itself is left alone — those are real
+   citations — only the glued-on digit is stripped, and only when it
+   looks like a sentence boundary, not a real number (`Appeal No.39`
+   is correctly left untouched).
+3. Curly quotes/dashes normalized to plain ASCII equivalents, and
+   excess whitespace collapsed.
+
+Every rule was tested against the real sample judgments with
+explicit pass/fail checks (including two cases that would have been
+false positives with a naive implementation) before being applied to
+the full batch.
 
 For now, **test against a small sample first** (e.g. the ~50 PDFs
 per court you mentioned) before pointing it at the full collection —

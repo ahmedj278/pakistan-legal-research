@@ -26,5 +26,10 @@ class RawDocument:
     extraction_status: str = "pending"  # pending | ok | empty_text | failed
     extraction_error: Optional[str] = None
 
+    # -- set during cleaning (Session 2.3) --
+    cleaned_text: Optional[str] = None
+    cleaned_char_count: Optional[int] = None
+    cleaning_status: str = "pending"  # pending | ok | skipped
+
     def to_dict(self) -> dict:
         return asdict(self)
