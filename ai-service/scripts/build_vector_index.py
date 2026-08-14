@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.chunk_loader import load_all_chunks  # noqa: E402
 from app.embeddings import embed_texts  # noqa: E402
 from app.vector_store import add_chunks, count  # noqa: E402
 
@@ -27,15 +28,6 @@ CHUNKS_DIR = (
     Path(__file__).resolve().parent.parent.parent / "ingestion" / "data" / "chunks"
 )
 BATCH_SIZE = 32
-
-
-def load_all_chunks() -> list:
-    chunks = []
-    for path in sorted(CHUNKS_DIR.glob("*.jsonl")):
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                chunks.append(json.loads(line))
-    return chunks
 
 
 def main():

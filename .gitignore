@@ -35,6 +35,7 @@ ingestion/data/chunks/*
 !ingestion/data/processed/.gitkeep
 !ingestion/data/chunks/.gitkeep
 ai-service/chroma_data/
+ai-service/bm25_index.pkl
 *.sqlite3
 *.db
 

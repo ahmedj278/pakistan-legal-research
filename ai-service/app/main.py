@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.search import semantic_search
+from app.bm25_search import keyword_search
 
 app = FastAPI(
     title="Pakistan Legal Research - AI Service",
@@ -38,4 +39,10 @@ class SearchRequest(BaseModel):
 @app.post("/search")
 def search(req: SearchRequest):
     results = semantic_search(req.query, n_results=req.n_results)
+    return {"query": req.query, "results": results}
+
+
+@app.post("/search/keyword")
+def search_keyword(req: SearchRequest):
+    results = keyword_search(req.query, n_results=req.n_results)
     return {"query": req.query, "results": results}
