@@ -19,6 +19,9 @@ load_dotenv(dotenv_path=ROOT_ENV_PATH)
 class Settings:
     node_env: str = os.getenv("NODE_ENV", "development")
     port: int = int(os.getenv("AI_SERVICE_PORT", "8000"))
+    embedding_model_name: str = os.getenv(
+        "EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2"
+    )
 
 
 settings = Settings()
