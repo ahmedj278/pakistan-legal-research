@@ -1,12 +1,13 @@
 """
 FastAPI entry point for the AI service.
 
-Health check (Module 1) plus basic semantic search (Module 3,
-Session 3.3). No keyword search, hybrid retrieval, reranking, or
-RAG yet — those are Modules 4-5.
+Health check (Module 1), semantic search, BM25 keyword search, and
+metadata filtering (Module 3, Sessions 3.1-3.5). No hybrid fusion or
+reranking yet — that's Module 4.
 """
 
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -14,6 +15,7 @@ from pydantic import BaseModel
 from app.config import settings
 from app.search import semantic_search
 from app.bm25_search import keyword_search
+from app.filters import build_filters
 
 app = FastAPI(
     title="Pakistan Legal Research - AI Service",
@@ -34,15 +36,23 @@ def health_check():
 class SearchRequest(BaseModel):
     query: str
     n_results: int = 5
+    # Optional metadata filters (Session 3.5). court expects the
+    # internal slug ("supreme_court" / "islamabad_high_court"), not
+    # the display name.
+    court: Optional[str] = None
+    year: Optional[int] = None
+    document_type: Optional[str] = None
 
 
 @app.post("/search")
 def search(req: SearchRequest):
-    results = semantic_search(req.query, n_results=req.n_results)
-    return {"query": req.query, "results": results}
+    filters = build_filters(req.court, req.year, req.document_type)
+    results = semantic_search(req.query, n_results=req.n_results, filters=filters)
+    return {"query": req.query, "filters": filters, "results": results}
 
 
 @app.post("/search/keyword")
 def search_keyword(req: SearchRequest):
-    results = keyword_search(req.query, n_results=req.n_results)
-    return {"query": req.query, "results": results}
+    filters = build_filters(req.court, req.year, req.document_type)
+    results = keyword_search(req.query, n_results=req.n_results, filters=filters)
+    return {"query": req.query, "filters": filters, "results": results}
