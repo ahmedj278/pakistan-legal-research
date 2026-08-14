@@ -4,8 +4,8 @@ Turns raw Pakistani court judgment PDFs into structured, extracted
 text ready for later processing (cleaning, metadata extraction,
 chunking — Sessions 2.3+).
 
-**Status:** Discovery, text extraction, and cleaning implemented
-(Module 2, Sessions 2.1–2.3).
+**Status:** Discovery, text extraction, cleaning, metadata
+extraction, and chunking implemented (Module 2, Sessions 2.1–2.5).
 
 **Scope:** Supreme Court and Islamabad High Court only, for now.
 Balochistan HC and Peshawar HC (whose judgments are merged into
@@ -25,13 +25,18 @@ ingestion/
 │   ├── discovery.py        finds PDF files (Session 2.1)
 │   ├── extraction.py       extracts text from each PDF (Session 2.2)
 │   ├── cleaning.py         cleans/normalizes extracted text (Session 2.3)
+│   ├── metadata.py          per-court metadata extractors (Session 2.4)
+│   ├── chunking.py          splits text into chunks (Session 2.5)
 │   ├── run_ingestion.py    entry point — runs discovery + extraction
-│   └── run_cleaning.py      entry point — runs cleaning on already-extracted output
+│   ├── run_cleaning.py      entry point — runs cleaning on already-extracted output
+│   ├── run_metadata.py      entry point — runs metadata extraction on cleaned output
+│   └── run_chunking.py      entry point — runs chunking, writes data/chunks/<court>.jsonl
 ├── data/
 │   ├── raw/                 put/point your PDFs here (gitignored)
 │   │   ├── supreme_court/
 │   │   └── islamabad_high_court/
-│   └── processed/            output JSON lands here (gitignored)
+│   ├── processed/            one JSON per PDF, accumulates fields through each stage (gitignored)
+│   └── chunks/                final output: one .jsonl per court, ready for Module 3 (gitignored)
 └── logs/                     one timestamped log file per run (gitignored)
 ```
 
@@ -98,6 +103,59 @@ Every rule was tested against the real sample judgments with
 explicit pass/fail checks (including two cases that would have been
 false positives with a naive implementation) before being applied to
 the full batch.
+
+## Run — metadata extraction
+
+```bash
+cd ingestion/src
+python run_metadata.py        # Windows: py run_metadata.py
+```
+
+Extracts case title, court, case number, year, judges, jurisdiction,
+hearing/decision dates, and document type (`JUDGMENT` vs
+`ORDER_SHEET`) — using a **separate extractor per court**, since SC
+and IHC judgments use genuinely different templates. Every field is
+optional: a missing field is recorded as `None` and logged as a
+warning, never a crash. `citation` is included in the data model but
+usually stays empty — court reporters assign citations after
+publication, so it's rarely present in the judgment text itself.
+
+## Run — chunking
+
+```bash
+cd ingestion/src
+python run_chunking.py        # Windows: py run_chunking.py
+```
+
+Splits each document's cleaned text into chunks (~1500 characters),
+preferring numbered legal paragraphs (`"2. The basic facts..."`) as
+the split point where present — that's how judgments are actually
+written, and it's a more meaningful retrieval unit than an arbitrary
+character window. Falls back to blank-line-separated blocks for
+documents without that structure (like short order sheets), and
+falls back further to sentence-splitting for any single unit that's
+still too large.
+
+**Every chunk carries its parent document's key metadata directly**
+(court, case title, case number, year, judges, document type) —
+not just an ID to look up later. That's what lets a future RAG
+answer cite "which case, which court, which year" straight from the
+retrieved chunk, satisfying the project's citation-grounding
+requirement (Module 5).
+
+Output: `data/chunks/<court>.jsonl` — one JSON object per line, one
+file per court. JSONL rather than one big JSON file so later stages
+(embedding generation, Module 3) can stream through chunks without
+loading an entire court's output into memory at once.
+
+Two real bugs were caught and fixed by testing chunking against the
+actual SC sample before trusting it: a naive sentence-splitting
+fallback broke `"Mr. Justice..."` into `"Mr."` and `"Justice..."` as
+separate fragments (both are periods followed by a capital letter,
+which looks like a sentence boundary to a naive regex), and the same
+issue affected numbered-paragraph markers themselves (`"4."` split
+off from the sentence it introduces). Both are fixed with explicit
+handling, not just avoided in the test case.
 
 For now, **test against a small sample first** (e.g. the ~50 PDFs
 per court you mentioned) before pointing it at the full collection —

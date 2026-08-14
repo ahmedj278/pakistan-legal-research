@@ -30,8 +30,10 @@ env/
 # .gitkeep-style README, but ignore actual data files.
 ingestion/data/raw/*
 ingestion/data/processed/*
+ingestion/data/chunks/*
 !ingestion/data/raw/.gitkeep
 !ingestion/data/processed/.gitkeep
+!ingestion/data/chunks/.gitkeep
 ai-service/chroma_data/
 *.sqlite3
 *.db
