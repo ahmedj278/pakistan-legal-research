@@ -8,11 +8,13 @@ keyword search (BM25), fusion, or reranking yet; those are Module 4.
 """
 
 from app.embeddings import embed_texts
+from app.filters import to_chroma_where
 from app.vector_store import query as vector_query
 
 
-def semantic_search(query_text: str, n_results: int = 5, where: dict = None) -> list:
+def semantic_search(query_text: str, n_results: int = 5, filters: dict = None) -> list:
     query_embedding = embed_texts([query_text])[0]
+    where = to_chroma_where(filters)
     results = vector_query(query_embedding, n_results=n_results, where=where)
 
     ids = results["ids"][0]

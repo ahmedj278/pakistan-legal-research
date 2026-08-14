@@ -23,6 +23,7 @@ from pathlib import Path
 from rank_bm25 import BM25Okapi
 
 from app.config import settings
+from app.filters import matches_filters
 
 BM25_INDEX_PATH = Path(settings.chroma_persist_dir).parent / "bm25_index.pkl"
 
@@ -68,15 +69,24 @@ def _load_index():
     _chunk_records = data["chunks"]
 
 
-def keyword_search(query_text: str, n_results: int = 5) -> list:
+def keyword_search(query_text: str, n_results: int = 5, filters: dict = None) -> list:
     _load_index()
 
     tokenized_query = tokenize(query_text)
     scores = _bm25.get_scores(tokenized_query)
 
-    ranked = sorted(
-        zip(_chunk_records, scores), key=lambda pair: pair[1], reverse=True
-    )[:n_results]
+    # Only keep chunks that actually matched at least one query term
+    # AND satisfy the metadata filters (if any). Filtering here,
+    # before sorting/slicing, means a filter can never cause fewer
+    # than n_results to be returned unnecessarily — everything that
+    # qualifies is considered before the top-N cut is made.
+    scored = [
+        (chunk, score)
+        for chunk, score in zip(_chunk_records, scores)
+        if score > 0 and (not filters or matches_filters(chunk, filters))
+    ]
+    scored.sort(key=lambda pair: pair[1], reverse=True)
+    ranked = scored[:n_results]
 
     results = []
     for chunk, score in ranked:

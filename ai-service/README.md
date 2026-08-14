@@ -3,9 +3,9 @@
 Python / FastAPI application.
 
 **Status:** Health check, embedding generation, vector storage
-(ChromaDB), semantic search, and BM25 keyword search implemented
-(Module 3, Sessions 3.1–3.4). No hybrid fusion, reranking, or
-metadata filtering yet.
+(ChromaDB), semantic search, BM25 keyword search, and metadata
+filtering implemented (Module 3, Sessions 3.1–3.5 — Module 3
+complete). No hybrid fusion or reranking yet — that's Module 4.
 
 ## Structure
 
@@ -20,7 +20,8 @@ ai-service/
 │   ├── embeddings.py       wraps the embedding model (Session 3.1)
 │   ├── vector_store.py     wraps ChromaDB (Session 3.2)
 │   ├── search.py           semantic search (Session 3.3)
-│   └── bm25_search.py      BM25 keyword search (Session 3.4)
+│   ├── bm25_search.py      BM25 keyword search (Session 3.4)
+│   └── filters.py          metadata filtering, shared by both (Session 3.5)
 └── scripts/
     ├── test_embeddings.py       standalone embedding smoke test
     ├── build_vector_index.py   embeds all chunks, loads into ChromaDB
@@ -179,6 +180,34 @@ and a nonsense query correctly scored 0.000 everywhere rather than
 returning a fabricated match. Still worth confirming the real
 `rank_bm25` package installs and runs identically on your machine,
 but this one has real confidence behind it, not just a syntax check.
+
+## Metadata filtering (Session 3.5)
+
+Both `/search` and `/search/keyword` now accept optional filters,
+using the metadata Module 2 already extracted:
+
+```bash
+curl -X POST http://localhost:8000/search/keyword \
+  -H "Content-Type: application/json" \
+  -d '{"query": "promotion", "court": "islamabad_high_court"}'
+```
+
+Available filter fields: `court` (internal slug —
+`"supreme_court"` / `"islamabad_high_court"`, not the display name),
+`year`, `document_type` (`"JUDGMENT"` / `"ORDER_SHEET"`). Any
+combination can be used together; omitted fields aren't filtered on.
+
+Implemented once, shared by both search methods (`app/filters.py`),
+so filtering behaves identically regardless of which retrieval
+method is used — matters once Module 4 combines them, since a
+filter shouldn't behave differently depending on which underlying
+method produced a given result.
+
+**Tested against real chunk data**: filtering a `"promotion"` query
+down to `court=islamabad_high_court` correctly returned 0 results
+(that content only exists in the Supreme Court sample), and the
+Chroma `where`-clause builder was verified to produce the exact
+shape ChromaDB expects for both single and combined filters.
 
 ## Notes
 
