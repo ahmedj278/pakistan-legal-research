@@ -209,6 +209,43 @@ down to `court=islamabad_high_court` correctly returned 0 results
 Chroma `where`-clause builder was verified to produce the exact
 shape ChromaDB expects for both single and combined filters.
 
+## Comparing embedding models
+
+Two models are registered for comparison (`app/model_registry.py`):
+`sentence-transformers/all-MiniLM-L6-v2` (general-purpose, 384d) and
+`nlpaueb/legal-bert-base-uncased` (legal-domain, 768d). Each gets
+its own ChromaDB collection — vectors from different models aren't
+comparable, so they're never mixed.
+
+```bash
+python scripts/build_vector_index.py           # builds ALL registered models
+python scripts/build_vector_index.py minilm    # or just one, by key
+python scripts/compare_embedding_models.py     # runs default test queries against both
+python scripts/compare_embedding_models.py "your own query"
+```
+
+`nlpaueb/legal-bert-base-uncased` is a **plain BERT checkpoint**,
+not a purpose-built sentence-embedding model — it has no
+`modules.json`/pooling config of its own. `sentence-transformers`
+handles this automatically: loading a plain transformer model with
+no sentence-embedding config triggers an automatic fallback to a
+Transformer + mean-Pooling module (confirmed directly against the
+official sentence-transformers docs before relying on it) — so this
+works with zero extra code, but it's worth knowing this fallback is
+happening rather than assuming the model was purpose-built for this.
+
+**Expect this one to be slower and heavier**: ~440MB vs MiniLM's
+~80MB, BERT-base size. Embedding all 1803 chunks will take
+meaningfully longer than MiniLM's ~107s — plausibly 10-20 minutes on
+CPU. Should still run fine on 8GB RAM, just budget the time.
+
+**Untested by me, same limitation as before** — no network here to
+install either model. The multi-model plumbing itself (separate
+collections, correct per-model dimensions, no cross-contamination)
+was verified against your real chunk data with both models stubbed
+out; the actual model behavior and comparison results need
+confirming on your machine.
+
 ## Notes
 
 - Reads configuration from the **root** `.env` file, same pattern as
