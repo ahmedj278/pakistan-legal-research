@@ -246,6 +246,47 @@ was verified against your real chunk data with both models stubbed
 out; the actual model behavior and comparison results need
 confirming on your machine.
 
+## Proper evaluation: Recall@K and MRR (brought forward from Session 4.4)
+
+Single-query eyeballing turned out too unreliable to judge the
+MiniLM-vs-LegalBERT comparison from — especially for "khula," a
+non-English legal term neither model was specifically trained on,
+where a bad result might mean "this model is worse" or might just
+mean "this word is poorly represented in general." Formal evaluation
+against known correct answers settles this properly.
+
+```bash
+python scripts/find_documents_containing.py khula
+# lists which real documents actually contain the term, with case
+# titles — use this to confirm/find entries for the test set below,
+# without manually opening PDFs
+
+python scripts/evaluate_retrieval.py
+```
+
+`eval/test_queries.json` holds the ground-truth set — each entry is
+a query plus the filename(s) of documents known to actually be
+relevant. **Currently only has 2 entries** (carried over from
+earlier manual testing) — add more before trusting the numbers;
+2 data points isn't enough to draw a real conclusion from. Aim for
+5-10.
+
+Reports Recall@1/3/5 and MRR for BM25 and every registered embedding
+model, side by side. `app/evaluation.py` is deliberately generic
+(takes any search function, not a specific implementation) — the
+exact same evaluation will be reused once hybrid retrieval and
+reranking exist (Module 4), to compare all four approaches with the
+same metrics instead of rebuilding this.
+
+**Verified with precisely controlled test cases** (not just real
+data, since I need to know the *math* is right, not just that it
+runs): a relevant result at rank 1 correctly gives Recall@1=1.0 and
+MRR=1.0; a relevant result at rank 3 gives Recall@1=0, Recall@3=1.0,
+MRR=0.333; a complete miss gives 0 across the board. The
+`find_documents_containing.py` helper was also confirmed against
+real chunk data — correctly found the right document for a known
+term.
+
 ## Notes
 
 - Reads configuration from the **root** `.env` file, same pattern as
