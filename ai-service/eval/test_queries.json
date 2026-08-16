@@ -1,0 +1,53 @@
+[
+  {
+    "query": "Does merely alleging fraud or forgery prevent a dispute from being referred to arbitration?",
+    "relevant_filenames": ["63646.pdf"],
+    "note": "Confirmed from supplied chunks — the judgment discusses whether allegations of fraud or forgery can prevent a dispute from being referred to arbitration and holds that mere allegations are insufficient."
+  },
+  {
+    "query": "Can an affidavit supporting an application for leave to defend rely on the facts stated in the application instead of repeating them?",
+    "relevant_filenames": ["64383.pdf"],
+    "note": "Confirmed from supplied chunks — the judgment considers an affidavit that expressly referred to the accompanying leave-to-defend application and held that repeating all the facts in the affidavit was hyper-technical."
+  },
+  {
+    "query": "Can an employee be dismissed for submitting a fake educational certificate even if that qualification was not required for the job?",
+    "relevant_filenames": ["64719.pdf"],
+    "note": "Confirmed from supplied chunks — the judgment discusses dismissal for submitting a fake educational certificate even though the higher qualification was not required for appointment."
+  },
+  {
+    "query": "Can a court rely on passport entry and exit stamps to determine whether defendants were in Pakistan when summons were allegedly served?",
+    "relevant_filenames": ["65302.pdf"],
+    "note": "Confirmed from supplied chunks — the judgment considers passport entry and exit stamps showing that the appellants were outside Pakistan on the dates when summons were allegedly served."
+  },
+  {
+    "query": "Are government employees on contract entitled to receive minimum wages according to the prevailing minimum wage policy?",
+    "relevant_filenames": ["65887.pdf"],
+    "note": "Confirmed from supplied chunks — the judgment discusses contractual government employees and holds that, notwithstanding their contractual status, they are entitled to minimum wages according to the prevailing policy."
+  },
+  {
+    "query": "Can a buyer obtain specific performance when he has not deposited the remaining sale consideration during the litigation?",
+    "relevant_filenames": ["c.a._99_k_2022.pdf"],
+    "note": "Confirmed from supplied chunks — the judgment discusses the buyer's failure to deposit the balance sale consideration and treats this as evidence of unwillingness to perform his part of the contract."
+  },
+  {
+    "query": "Can a mutation in the revenue record be considered both bogus and fraudulent?",
+    "relevant_filenames": ["c.a._95_p_2014.pdf"],
+    "note": "Confirmed from supplied chunks — the Supreme Court discusses the allegation that recorded property mutations were bogus and fraudulent and explains why describing them as both is self-contradictory."
+  },
+  {
+    "query": "Can a tax law be struck down if it does not clearly specify what activity involving tobacco is being taxed?",
+    "relevant_filenames": ["c.a._174_2012.pdf"],
+    "note": "Confirmed from supplied chunks — the judgment records the challenge that a provincial tobacco cess law was vague because it did not identify whether the tax applied to growing, sale, production, or consumption of tobacco."
+  },
+  {
+    "query": "When can sponsors become personally liable for a company's financial obligations under a sponsors' undertaking?",
+    "relevant_filenames": ["C.A._157_K_2016.pdf"],
+    "note": "Confirmed from supplied chunks — the judgment interprets clauses 6 and 7 of the Sponsors' Undertaking as providing personal recourse against the sponsors where the company is unable to settle its financial obligations."
+  },
+  {
+    "query": "Is the market value at the time of notification under Section 4 the only factor for determining compensation for land acquisition?",
+    "relevant_filenames": ["c.a._119_l_2022.pdf"],
+    "note": "Confirmed from supplied chunks — the judgment states that market value at the time of notification under Section 4 is only one mode of assessing market value and not the sole yardstick for determining compensation."
+  }
+]
+

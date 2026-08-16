@@ -42,12 +42,98 @@ observations with a proper test set.
 - Good validation that semantic search is doing real work, not just
   returning noise that happens to look plausible.
 
-## Conclusion at this stage
+## Test 4 — "khula" and "murder", BM25 vs. semantic head-to-head (100-doc corpus)
 
-Basic semantic search works as expected on relevant queries, and
-fails in the expected, well-understood way (semantic drift, not
-crash/garbage) on queries with no good match in the current small
-sample. Real retrieval quality — especially recall on
-underrepresented topics — can't be judged properly until the corpus
-is scaled up and/or BM25 + hybrid retrieval (Module 4) are in place.
-Formal evaluation with a real query/ground-truth set is Session 4.4.
+Direct comparison, both endpoints, same queries.
+
+**"khula":** BM25 correctly returned `64137.pdf` at the top — chunk
+explicitly discusses a suit for dissolution of marriage on the basis
+of khula. Semantic search did NOT return that document at all;
+instead returned other judgments, one (`64396.pdf`) with genuine
+conceptual overlap (marital breakdown, wife leaving the matrimonial
+home) but the rest largely unrelated. Confirms the Test 2 hypothesis
+directly: BM25 finds it, semantic search misses it and surfaces
+noise instead.
+
+**"murder":** Both BM25 and semantic search correctly returned
+`68800.pdf` first. Semantic search's remaining results were only
+loosely related (banking liability, NAB proceedings) — similarity
+alone doesn't guarantee legal relevance. **A real bug was found
+here**: BM25's other results (`63646.pdf`, unrelated commercial
+arbitration) had a score of 0.0 — it was padding out to the
+requested result count with non-matches instead of returning fewer,
+genuinely-matching results. Fixed in `bm25_search.py`:
+`keyword_search()` now filters out any result with `score <= 0`
+before taking the top N, so a query can legitimately return fewer
+results than requested. Verified against real chunk data: a query
+for "promotion" with `n_results=10` correctly returned only the 6
+chunks that actually matched, and a nonsense query now returns an
+empty list instead of fabricated results.
+
+## Conclusion after round 2
+
+- BM25 reliably finds exact terminology; semantic search finds
+  conceptually related language even without the exact word, but
+  with real noise mixed in — similarity score is not the same as
+  legal relevance.
+- Neither method should be judged as "accurate" in isolation yet —
+  absence of a good result may just mean the corpus (still ~100
+  docs) doesn't contain a good match, not that retrieval failed.
+- This is direct, concrete motivation for hybrid retrieval +
+  reranking (Module 4) — and the right next step is to test whether
+  hybrid actually improves top-k quality, not to assume it will.
+
+## Test 5 — Embedding model comparison, formal evaluation (Recall@K, MRR)
+
+Manual single-query testing (Test 4) wasn't reliable enough to
+compare embedding models properly — too few data points, and
+"khula" specifically is a non-English legal term neither model was
+trained on, so a bad result there could mean "worse model" or just
+"underrepresented word," impossible to tell apart from one query.
+Built a proper evaluation harness instead (`app/evaluation.py`,
+`scripts/evaluate_retrieval.py`): Recall@1/3/5 and MRR against a
+manually curated set of query → known-correct-document pairs.
+
+Three models compared:
+
+| Method       | Recall@1 | Recall@3 | Recall@5 | MRR  |
+|--------------|----------|----------|----------|------|
+| bm25         | 1.0      | 1.0      | 1.0      | 1.0  |
+| minilm       | 0.9      | 1.0      | 1.0      | 0.95 |
+| legalbert    | 0.6      | 0.7      | 0.7      | 0.65 |
+| legalbert_st | 0.8      | 1.0      | 1.0      | 0.9  |
+
+- **legalbert** = `nlpaueb/legal-bert-base-uncased`, a raw BERT
+  checkpoint with no native sentence-embedding config —
+  sentence-transformers automatically falls back to mean-pooling
+  token embeddings for it.
+- **legalbert_st** = `IoannisKat1/legal-bert-base-uncased-legal-matryoshka`,
+  the same base legal-domain model, but actually fine-tuned as a
+  sentence embedder (contrastive training on sentence pairs, not
+  just an automatic pooling fallback).
+
+**Finding:** raw `legalbert` clearly underperforms both general-purpose
+MiniLM and the properly fine-tuned legal model. This matches the
+historical reason Sentence-BERT was created in the first place — raw
+BERT's mean-pooled embeddings were found (in the original 2019
+Sentence-BERT paper) to perform *worse* than averaged GloVe vectors
+on sentence-similarity tasks, because BERT's masked-word training
+objective was never aimed at making similar/dissimilar sentence
+pairs separate cleanly in vector space. `legalbert_st` closing most
+of the gap to MiniLM (Recall@1 0.6→0.8, MRR 0.65→0.9) confirms this
+was a training-objective mismatch, not evidence that legal-domain
+training itself doesn't help.
+
+**Decision:** dropped `legalbert` from `app/model_registry.py`,
+kept `legalbert_st` alongside `minilm` for continued comparison.
+Neither BM25 nor either embedding model was declared a final winner
+— BM25's perfect score here is expected and partly an artifact of a
+small, keyword-friendly test set; the real comparison this sets up
+is for Module 4's hybrid retrieval + reranking evaluation, using
+this exact same harness.
+
+**Caveat:** the test set is still small. These numbers should be
+treated as directional, not conclusive, until more ground-truth
+queries are added (see `scripts/find_documents_containing.py`) and/or
+the corpus is scaled up in Module 8.
+
