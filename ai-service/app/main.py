@@ -1,9 +1,9 @@
 """
 FastAPI entry point for the AI service.
 
-Health check (Module 1), semantic search, BM25 keyword search, and
-metadata filtering (Module 3, Sessions 3.1-3.5). No hybrid fusion or
-reranking yet — that's Module 4.
+Health check (Module 1), semantic search, BM25 keyword search,
+metadata filtering (Module 3), and hybrid retrieval via RRF fusion
+(Module 4, Sessions 4.1-4.2). No reranking yet — Session 4.3.
 """
 
 from datetime import datetime, timezone
@@ -15,6 +15,8 @@ from pydantic import BaseModel
 from app.config import settings
 from app.search import semantic_search
 from app.bm25_search import keyword_search
+from app.hybrid_search import hybrid_search
+from app.reranked_search import reranked_search
 from app.filters import build_filters
 
 app = FastAPI(
@@ -55,4 +57,18 @@ def search(req: SearchRequest):
 def search_keyword(req: SearchRequest):
     filters = build_filters(req.court, req.year, req.document_type)
     results = keyword_search(req.query, n_results=req.n_results, filters=filters)
+    return {"query": req.query, "filters": filters, "results": results}
+
+
+@app.post("/search/hybrid")
+def search_hybrid(req: SearchRequest):
+    filters = build_filters(req.court, req.year, req.document_type)
+    results = hybrid_search(req.query, n_results=req.n_results, filters=filters)
+    return {"query": req.query, "filters": filters, "results": results}
+
+
+@app.post("/search/reranked")
+def search_reranked(req: SearchRequest):
+    filters = build_filters(req.court, req.year, req.document_type)
+    results = reranked_search(req.query, n_results=req.n_results, filters=filters)
     return {"query": req.query, "filters": filters, "results": results}

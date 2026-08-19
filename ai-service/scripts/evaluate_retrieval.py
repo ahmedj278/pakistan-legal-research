@@ -30,6 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.bm25_search import keyword_search  # noqa: E402
 from app.evaluation import evaluate  # noqa: E402
+from app.hybrid_search import hybrid_search  # noqa: E402
+from app.reranked_search import reranked_search  # noqa: E402
 from app.model_registry import EMBEDDING_MODELS  # noqa: E402
 from app.search import semantic_search  # noqa: E402
 
@@ -71,12 +73,45 @@ def main():
         metrics = evaluate(search_fn, test_queries)
         results_table.append((model_key, metrics))
 
-    print(f"{'Method':<12} {'Recall@1':<10} {'Recall@3':<10} {'Recall@5':<10} {'MRR':<8}")
-    print("-" * 52)
+    # Hybrid with EACH registered embedding model — not just the
+    # default. Testing hybrid only with the default model would miss
+    # exactly the interesting comparison: does fusing BM25 with the
+    # STRONGEST embedding model beat that model alone, or does
+    # fusing with a weak component drag a strong one down?
+    for model_key, model_config in EMBEDDING_MODELS.items():
+        def hybrid_fn(q, n, model_config=model_config):
+            return hybrid_search(
+                q,
+                n_results=n,
+                model_name=model_config["model_name"],
+                collection_name=model_config["collection_name"],
+            )
+
+        metrics = evaluate(hybrid_fn, test_queries)
+        results_table.append((f"hybrid+{model_key}", metrics))
+
+    # Reranked: BM25 + semantic -> RRF -> cross-encoder rerank. This is
+    # the actual answer to "does reranking fix what naive fusion got
+    # wrong" (see docs/retrieval-notes.md, Tests 7-8) — evaluated per
+    # embedding model, same reasoning as hybrid above.
+    for model_key, model_config in EMBEDDING_MODELS.items():
+        def reranked_fn(q, n, model_config=model_config):
+            return reranked_search(
+                q,
+                n_results=n,
+                model_name=model_config["model_name"],
+                collection_name=model_config["collection_name"],
+            )
+
+        metrics = evaluate(reranked_fn, test_queries)
+        results_table.append((f"reranked+{model_key}", metrics))
+
+    print(f"{'Method':<22} {'Recall@1':<10} {'Recall@3':<10} {'Recall@5':<10} {'MRR':<8}")
+    print("-" * 62)
     for name, m in results_table:
         r = m["recall_at_k"]
         print(
-            f"{name:<12} {r.get(1, '-'):<10} {r.get(3, '-'):<10} "
+            f"{name:<22} {r.get(1, '-'):<10} {r.get(3, '-'):<10} "
             f"{r.get(5, '-'):<10} {m['mrr']:<8}"
         )
 

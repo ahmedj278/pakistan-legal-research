@@ -42,5 +42,9 @@ class Settings:
     )
     chroma_collection_name: str = os.getenv("CHROMA_COLLECTION_NAME") or "pk_judgments"
 
+    reranker_model_name: str = (
+        os.getenv("RERANKER_MODEL_NAME") or "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    )
+
 
 settings = Settings()

@@ -2,10 +2,11 @@
 
 Python / FastAPI application.
 
-**Status:** Health check, embedding generation, vector storage
-(ChromaDB), semantic search, BM25 keyword search, and metadata
-filtering implemented (Module 3, Sessions 3.1–3.5 — Module 3
-complete). No hybrid fusion or reranking yet — that's Module 4.
+**Status:** Full retrieval pipeline complete — embeddings, vector
+storage, semantic search, BM25, metadata filtering, hybrid RRF
+fusion, and cross-encoder reranking (Module 3 complete; Module 4,
+Sessions 4.1–4.3). Retrieval evaluation harness in place. No RAG/LLM
+answer generation yet — that's Module 5.
 
 ## Structure
 
@@ -13,19 +14,29 @@ complete). No hybrid fusion or reranking yet — that's Module 4.
 ai-service/
 ├── requirements.txt
 ├── app/
-│   ├── __init__.py
-│   ├── main.py            FastAPI app: /health, /search, /search/keyword
-│   ├── config.py           centralized environment variable access
-│   ├── chunk_loader.py     shared loader for Module 2's chunk output
-│   ├── embeddings.py       wraps the embedding model (Session 3.1)
-│   ├── vector_store.py     wraps ChromaDB (Session 3.2)
-│   ├── search.py           semantic search (Session 3.3)
-│   ├── bm25_search.py      BM25 keyword search (Session 3.4)
-│   └── filters.py          metadata filtering, shared by both (Session 3.5)
+│   ├── main.py              /health, /search, /search/keyword, /search/hybrid, /search/reranked
+│   ├── config.py
+│   ├── chunk_loader.py
+│   ├── embeddings.py
+│   ├── model_registry.py
+│   ├── vector_store.py
+│   ├── search.py             semantic search (3.3)
+│   ├── bm25_search.py        BM25 (3.4)
+│   ├── filters.py            metadata filtering (3.5)
+│   ├── evaluation.py         Recall@K / MRR metrics
+│   ├── hybrid_search.py      RRF fusion (4.1-4.2)
+│   ├── reranker.py           cross-encoder wrapper (4.3)
+│   └── reranked_search.py    full pipeline: BM25+semantic -> RRF -> rerank (4.3)
+├── eval/
+│   └── test_queries.json
 └── scripts/
-    ├── test_embeddings.py       standalone embedding smoke test
-    ├── build_vector_index.py   embeds all chunks, loads into ChromaDB
-    └── build_bm25_index.py     builds the BM25 keyword index
+    ├── test_embeddings.py
+    ├── build_vector_index.py
+    ├── build_bm25_index.py
+    ├── compare_embedding_models.py
+    ├── evaluate_retrieval.py
+    ├── find_documents_containing.py
+    └── inspect_query_overlap.py
 ```
 
 ## Setup
@@ -286,6 +297,77 @@ MRR=0.333; a complete miss gives 0 across the board. The
 `find_documents_containing.py` helper was also confirmed against
 real chunk data — correctly found the right document for a known
 term.
+
+## Hybrid retrieval (Sessions 4.1-4.2)
+
+```bash
+curl -X POST http://localhost:8000/search/hybrid \
+  -H "Content-Type: application/json" \
+  -d '{"query": "khula", "n_results": 5}'
+```
+
+Combines BM25 and semantic search using **Reciprocal Rank Fusion
+(RRF)**: each method runs independently with a larger candidate
+pool (20 by default) than requested, and results are combined by
+**rank position**, not raw score — a BM25 score and a cosine
+similarity aren't on the same scale, so averaging them directly
+would be meaningless. A chunk found near the top of *both* lists
+outranks one found in only one list, even if that one list ranked it
+#1. Each result in the response includes an `rrf_score` reflecting
+this combined rank, alongside its normal text/metadata.
+
+Uses `settings.embedding_model_name` (the default embedding model)
+for its semantic half — currently `minilm`.
+
+**Verified two ways**: the RRF math itself was checked against a
+hand-computed expected ranking (not just "does it run") — confirmed
+exact score values and ordering. Then the full pipeline was run
+end-to-end against real chunk data with a real BM25 index and
+cosine-similarity-based fake embeddings, confirming genuinely
+correct, sensibly-ranked results.
+
+`scripts/evaluate_retrieval.py` now includes a `hybrid` row, so
+Recall@K/MRR can be compared directly against BM25-only and
+semantic-only — the actual point of building this, per your own
+"test whether hybrid actually helps, don't assume it" conclusion
+from manual testing.
+
+## Reranking (Session 4.3)
+
+```bash
+curl -X POST http://localhost:8000/search/reranked \
+  -H "Content-Type: application/json" \
+  -d '{"query": "PLD 2024 SC 1276", "n_results": 5}'
+```
+
+Completes the full pipeline: BM25 + semantic search → RRF fusion →
+**cross-encoder reranking**. Unlike RRF (which only combines rank
+*positions*), a cross-encoder reads the query and each candidate
+passage *together* and produces a direct relevance judgment — this
+is what should fix the specific failure found in manual testing
+(`docs/retrieval-notes.md`, Test 8): a citation-lookup query where
+the literally-correct chunk was buried under superficially
+citation-shaped noise by naive rank fusion.
+
+Uses `sentence-transformers`' `CrossEncoder` — **no new dependency**,
+it's the same package installed since Session 3.1. Model:
+`cross-encoder/ms-marco-MiniLM-L-6-v2` (`RERANKER_MODEL_NAME` in
+`.env`), a standard general-purpose reranker — not legal-tuned, same
+documented limitation as the embedding model situation, swappable
+later the same way.
+
+**Verified with a real, non-random test**: a fake cross-encoder
+scoring by genuine word overlap, given the exact Test 8 scenario
+(correct chunk deliberately placed last) — confirmed it correctly
+promotes the truly relevant chunk to #1. The full pipeline
+(BM25+semantic → RRF → rerank) was also run end-to-end against real
+chunk data, confirming both `rrf_score` and `rerank_score` survive
+correctly through every stage.
+
+`scripts/evaluate_retrieval.py` now includes `reranked+<model>` rows
+for every registered embedding model — the real test of whether
+reranking recovers what naive hybrid fusion lost (Test 7) and fixes
+the citation-burying failure (Test 8), rather than assuming it does.
 
 ## Notes
 
