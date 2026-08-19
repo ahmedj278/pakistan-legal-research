@@ -241,3 +241,43 @@ the truly correct one only had one weak-but-real signal. Motivates
 Session 4.3 (reranking) as a direct fix: a cross-encoder judges each
 candidate against the query directly, rather than trusting blind
 rank fusion.
+
+## Test 9 — Reranking is the actual cause of the citation-lookup failure, not retrieval
+
+Traced Test 8's failure directly with `scripts/debug_query_trace.py`,
+per the question "was the correct chunk even in the pre-rerank
+candidate pool?":
+
+```
+Hybrid candidate pool size: 20
+FOUND in hybrid pool at rank 4/20, rrf_score=0.01639
+After reranking: rank 11/20, rerank_score=-4.9249
+```
+
+**Confirmed: retrieval was never the problem.** BM25+RRF correctly
+surfaced the right chunk at rank 4/20. The cross-encoder reranker
+then made it *worse* — pushing it from rank 4 to rank 11, past
+several unrelated chunks scored higher (best: -0.316 vs the correct
+chunk's -4.925).
+
+**Root cause:** `cross-encoder/ms-marco-MiniLM-L-6-v2` is trained on
+MS MARCO — natural-language Bing search queries matched to
+natural-language answer passages. It has no training signal for
+"does this passage contain this exact formal citation string" — a
+structured identifier lookup is a fundamentally different task from
+what it was trained to judge. Instead of rewarding the verbatim
+match, it appears to score based on general topical/discourse
+similarity, where other legal-sounding passages can outscore the
+one containing the actual answer.
+
+**Conclusion:** this is a real, documented limitation of using a
+general-purpose reranker for citation-style queries specifically —
+not a flaw in the retrieval pipeline itself (which worked correctly
+up to this point). Reinforces the same conclusion as the
+hybrid-vs-alone finding (Test 7): no single fixed method (or
+fixed pipeline configuration) is best for every query type. This is
+exactly what the roadmap's Module 6 (query classification/routing —
+explicitly including "citation lookup" as a named query type) is
+meant to solve: detect a citation-style query and route it to BM25
+directly, skipping semantic search and reranking entirely for that
+case, rather than forcing every query through the same pipeline.
