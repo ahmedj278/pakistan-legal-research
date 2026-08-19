@@ -137,3 +137,107 @@ treated as directional, not conclusive, until more ground-truth
 queries are added (see `scripts/find_documents_containing.py`) and/or
 the corpus is scaled up in Module 8.
 
+## Test 6 — Test set correction, and hybrid retrieval's real value
+
+The 10 queries used in Test 5 turned out to still share many exact
+words with their source chunks, despite being LLM-"paraphrased" —
+confirmed by building `scripts/inspect_query_overlap.py`, which
+measures literal word overlap between each query and its correct
+document directly, instead of trusting "paraphrased" as a label.
+Regenerated the queries with an explicit instruction to avoid shared
+keywords. Results changed completely:
+
+| Method       | Recall@1 | Recall@3 | Recall@5 | MRR   |
+|--------------|----------|----------|----------|-------|
+| bm25         | 0.1      | 0.4      | 0.5      | 0.242 |
+| minilm       | 0.4      | 0.5      | 0.6      | 0.475 |
+| legalbert_st | 0.6      | 0.7      | 0.8      | 0.675 |
+| hybrid (bug) | 0.4      | 0.5      | 0.6      | 0.470 |
+
+BM25 collapsing (MRR 1.0 → 0.242) once queries stop sharing literal
+words is the expected, correct behavior — confirms the earlier
+perfect scores were a test-set artifact (see Test 5's caveat), not
+real retrieval quality. `legalbert_st` is now clearly the strongest
+individual method — the first real evidence the legal-domain
+fine-tuning helps, now that the test actually requires semantic
+understanding instead of keyword luck.
+
+**Bug found:** the "hybrid" row above used `hybrid_search()`'s
+default embedding model (MiniLM), not `legalbert_st` — so hybrid was
+fusing a weak method (BM25, 0.242 MRR here) with a medium one
+(MiniLM, 0.475), never actually tested with the strongest available
+component. Fixed: `hybrid_search()` now accepts `model_name`/
+`collection_name` overrides (same pattern as `semantic_search()`),
+and `evaluate_retrieval.py` runs hybrid against **every** registered
+embedding model, so the real question — does BM25 + the *best*
+embedding model beat that model alone? — can actually be answered,
+instead of only ever testing hybrid with a mediocre pairing.
+
+Re-run `scripts/evaluate_retrieval.py` after this fix to see the
+corrected `hybrid+minilm` and `hybrid+legalbert_st` rows.
+
+## Test 7 — Hybrid does not beat the best individual model
+
+With the fix applied and a further-refined (harder, lower-overlap)
+query set:
+
+| Method              | Recall@1 | Recall@3 | Recall@5 | MRR   |
+|---------------------|----------|----------|----------|-------|
+| bm25                | 0.1      | 0.4      | 0.5      | 0.242 |
+| minilm              | 0.5      | 0.7      | 0.8      | 0.62  |
+| legalbert_st         | 0.7      | 0.9      | 1.0      | 0.808 |
+| hybrid+minilm        | 0.4      | 0.5      | 0.6      | 0.47  |
+| hybrid+legalbert_st  | 0.5      | 0.8      | 1.0      | 0.667 |
+
+**`legalbert_st` alone beats `hybrid+legalbert_st` on every metric
+except a tied Recall@5.** This is a real, mechanistic finding, not
+noise:
+
+RRF treats every input ranking as equally trustworthy — it only
+looks at rank *position*, never how good that ranking actually is.
+On this query set BM25 is weak (MRR 0.242, by design — the queries
+deliberately avoid shared keywords). When BM25 confidently places a
+*wrong* document at its own #1, that document still earns a full
+`1/(k+1)` RRF contribution — occasionally enough to outrank the
+correct chunk that `legalbert_st` already had correctly at #1 but
+which only gets credit from one source. This matches the data
+exactly: Recall@5 held at 1.0 (nothing was lost from the merged
+candidate pool), but Recall@1 dropped (BM25 noise displaced the
+correct answer from the very top rank, not further down).
+
+**Conclusion:** naive, unweighted RRF is not a free improvement — it
+helps when both retrievers are reasonably competent and
+complementary, and can actively hurt when one is clearly weaker on a
+given query distribution. For this project, right now,
+**`legalbert_st` alone is the strongest retriever measured**, and
+hybrid fusion as currently implemented adds no value on top of it.
+
+This directly motivates Session 4.3 (reranking) as a genuinely
+different mechanism worth testing, rather than assuming it will
+help either: a cross-encoder reranker *jointly* scores each
+candidate against the query for actual relevance, rather than
+blindly merging rank positions the way RRF does. The open question
+to test next: can reranking the combined BM25+semantic candidate
+pool recover — or beat — `legalbert_st` alone, by filtering out
+BM25's noisy candidates through genuine relevance judgment instead
+of naive rank fusion?
+
+
+
+## Test 8 — Real citation-lookup query exposes a compound weakness
+
+Query: `"PLD 2024 SC 1276"` via `/search/hybrid`. The chunk literally
+containing that exact citation scored BM25's clear #1 (`bm25_score`
+17.30, far above any other result) — BM25 worked correctly. But its
+final `rrf_score` (0.01639 ≈ exactly `1/61`) shows it got **zero**
+credit from semantic search — MiniLM didn't retrieve it at all.
+Meanwhile an unrelated chunk citing different cases outranked it
+overall, because BM25's simple tokenizer splits the citation into
+independent words (`pld`, `2024`, `sc`, `1276`), so any
+citation-dense chunk picks up partial credit on the common tokens
+(`"PLD"`, `"SC"`) even without matching the specific number. RRF
+then compounds this by crediting that chunk from both lists while
+the truly correct one only had one weak-but-real signal. Motivates
+Session 4.3 (reranking) as a direct fix: a cross-encoder judges each
+candidate against the query directly, rather than trusting blind
+rank fusion.
