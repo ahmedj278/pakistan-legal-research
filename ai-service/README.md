@@ -2,11 +2,9 @@
 
 Python / FastAPI application.
 
-**Status:** Full retrieval pipeline complete — embeddings, vector
-storage, semantic search, BM25, metadata filtering, hybrid RRF
-fusion, and cross-encoder reranking (Module 3 complete; Module 4,
-Sessions 4.1–4.3). Retrieval evaluation harness in place. No RAG/LLM
-answer generation yet — that's Module 5.
+**Status:** Full retrieval pipeline complete (Module 3-4). LLM
+abstraction layer implemented (Module 5, Session 5.1). No RAG
+pipeline, citation grounding, or answer generation yet.
 
 ## Structure
 
@@ -20,13 +18,14 @@ ai-service/
 │   ├── embeddings.py
 │   ├── model_registry.py
 │   ├── vector_store.py
-│   ├── search.py             semantic search (3.3)
-│   ├── bm25_search.py        BM25 (3.4)
-│   ├── filters.py            metadata filtering (3.5)
+│   ├── search.py             semantic search
+│   ├── bm25_search.py        BM25
+│   ├── filters.py            metadata filtering
 │   ├── evaluation.py         Recall@K / MRR metrics
-│   ├── hybrid_search.py      RRF fusion (4.1-4.2)
-│   ├── reranker.py           cross-encoder wrapper (4.3)
-│   └── reranked_search.py    full pipeline: BM25+semantic -> RRF -> rerank (4.3)
+│   ├── hybrid_search.py      RRF fusion
+│   ├── reranker.py           cross-encoder wrapper
+│   ├── reranked_search.py    full retrieval pipeline
+│   └── llm.py                LLM provider abstraction (Session 5.1)
 ├── eval/
 │   └── test_queries.json
 └── scripts/
@@ -36,7 +35,8 @@ ai-service/
     ├── compare_embedding_models.py
     ├── evaluate_retrieval.py
     ├── find_documents_containing.py
-    └── inspect_query_overlap.py
+    ├── inspect_query_overlap.py
+    └── debug_query_trace.py
 ```
 
 ## Setup
@@ -368,6 +368,57 @@ correctly through every stage.
 for every registered embedding model — the real test of whether
 reranking recovers what naive hybrid fusion lost (Test 7) and fixes
 the citation-burying failure (Test 8), rather than assuming it does.
+
+## LLM abstraction (Session 5.1)
+
+`app/llm.py` provides one function, `generate(prompt, system, max_tokens)`,
+that RAG code (Session 5.2+) will call — never a provider SDK
+directly. Two providers implemented: **Gemini** (default) and
+Anthropic (kept as a secondary option).
+
+**Why Gemini, not Anthropic/Claude, as the default:** verified via
+web search (not assumed from memory, since free-tier terms change
+often) that Anthropic and OpenAI only give a small one-time trial
+credit (~$5, requires phone verification) — not an ongoing free
+tier. Google's Gemini API, via Google AI Studio, offers a genuinely
+free, permanent, no-credit-card tier (~1,500 requests/day on Flash
+models as of this writing) — the right choice for a student project
+with no budget.
+
+**Setup:**
+1. Get a **free** key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+   — no credit card, no billing setup.
+2. Add it to your local `.env`:
+   ```
+   LLM_API_KEY=...
+   ```
+   `LLM_PROVIDER=gemini` and `LLM_MODEL_NAME=gemini-2.5-flash` are
+   already the defaults.
+
+**Important caveat — Google's Python SDK is actively changing.** I
+verified the current package name (`google-genai`) and API shape via
+web search rather than from memory, since Google has restructured
+this SDK before. The most recent official docs I could find show a
+`client.interactions.create()` pattern, which is what this code
+uses — but if it errors on your machine, check whatever
+`pip install google-genai` actually installs against its own
+quickstart example, since this surface may have shifted again by the
+time you run it. This is flagged honestly rather than assumed to
+just work.
+
+**What's verified vs. not:** the request-building and response-parsing
+logic was tested with a mock matching the documented SDK shape
+(correct model name, prompt content, response extraction) — but a
+real live call hasn't been made (no network in my sandbox to install
+either SDK). Both providers' error paths (missing key, unknown
+provider) were verified together, including that switching providers
+via `LLM_PROVIDER` genuinely changes behavior.
+
+```bash
+cd ai-service
+pip install -r requirements.txt
+python -c "from app.llm import generate; print(generate('Say hello in one sentence.'))"
+```
 
 ## Notes
 

@@ -46,5 +46,9 @@ class Settings:
         os.getenv("RERANKER_MODEL_NAME") or "cross-encoder/ms-marco-MiniLM-L-6-v2"
     )
 
+    llm_provider: str = os.getenv("LLM_PROVIDER") or "gemini"
+    llm_model_name: str = os.getenv("LLM_MODEL_NAME") or "gemini-2.5-flash"
+    llm_api_key: str = os.getenv("LLM_API_KEY") or ""
+
 
 settings = Settings()
