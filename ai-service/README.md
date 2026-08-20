@@ -2,9 +2,12 @@
 
 Python / FastAPI application.
 
-**Status:** Full retrieval pipeline complete (Module 3-4). LLM
-abstraction layer implemented (Module 5, Session 5.1). No RAG
-pipeline, citation grounding, or answer generation yet.
+**Status:** Full retrieval pipeline complete (Module 3-4). RAG
+pipeline with structured citations implemented (Module 5, Sessions
+5.1-5.3) — `/ask` returns an answer with inline `[N]` citation
+markers, plus a structured, traceable source list. No hardened
+insufficient-evidence handling beyond a system-prompt instruction
+yet — Session 5.5.
 
 ## Structure
 
@@ -12,7 +15,7 @@ pipeline, citation grounding, or answer generation yet.
 ai-service/
 ├── requirements.txt
 ├── app/
-│   ├── main.py              /health, /search, /search/keyword, /search/hybrid, /search/reranked
+│   ├── main.py              /health, /search*, /search/hybrid, /search/reranked, /ask
 │   ├── config.py
 │   ├── chunk_loader.py
 │   ├── embeddings.py
@@ -25,7 +28,9 @@ ai-service/
 │   ├── hybrid_search.py      RRF fusion
 │   ├── reranker.py           cross-encoder wrapper
 │   ├── reranked_search.py    full retrieval pipeline
-│   └── llm.py                LLM provider abstraction (Session 5.1)
+│   ├── llm.py                LLM provider abstraction (Session 5.1)
+│   ├── rag.py                basic RAG pipeline (Session 5.2)
+│   └── citations.py          citation extraction (Session 5.3)
 ├── eval/
 │   └── test_queries.json
 └── scripts/
@@ -419,6 +424,87 @@ cd ai-service
 pip install -r requirements.txt
 python -c "from app.llm import generate; print(generate('Say hello in one sentence.'))"
 ```
+
+## Basic RAG pipeline (Session 5.2)
+
+```bash
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What did the court decide about promotion seniority?"}'
+```
+
+Wires together the full retrieval pipeline (Module 4:
+BM25+semantic → RRF → rerank) and the LLM (Session 5.1) into one
+flow: retrieve the top passages, build a labeled context block
+(court, case title, year — enough to trace each passage back to its
+source), and ask the LLM to answer using *only* those passages.
+
+Deliberately basic for this session:
+- No structured citation markers in the answer text yet (e.g.
+  `[Passage 1]` references) — that's Session 5.3.
+- Insufficient-evidence handling is currently just a system-prompt
+  instruction ("say so plainly instead of guessing"), not yet a
+  hardened, tested safeguard — that's Session 5.5.
+- The response includes the full `passages` list alongside the
+  answer, so you can already manually verify grounding by comparing
+  the answer against what was actually retrieved.
+
+**A real cost-consciousness detail, worth knowing:** if retrieval
+returns nothing, `answer_question()` returns immediately without
+calling the LLM at all — verified explicitly with a test that
+asserts zero LLM calls happen in that case. Even on a free tier,
+there's no reason to burn a request when there's nothing to ground
+an answer in.
+
+**Verified with mocked retrieval + LLM** against realistic,
+correctly-shaped passage data: confirmed `build_context()` produces
+correctly labeled, traceable output; confirmed the LLM is called
+with both the retrieved text and the question actually present in
+the prompt, and the grounding/no-fabrication instructions intact in
+the system prompt. **Not yet verified: a real end-to-end call** —
+needs your actual Gemini key and a real question against your real
+corpus.
+
+## Citations (Session 5.3)
+
+The LLM is now instructed to cite its sources inline — `"The court
+held X [2]."` — using the same `[N]` numbering shown in the passage
+context. `app/citations.py` parses those markers out of the answer
+text afterward and builds a real, structured source list:
+
+```json
+{
+  "answer": "Waris Ali joined the police force in 1988 [1]...",
+  "citations": [
+    {
+      "number": 1,
+      "chunk_id": "promo.pdf::chunk_1",
+      "court_name": "Supreme Court of Pakistan",
+      "case_title": "IGP Punjab vs Waris Ali",
+      "case_number": "C.A. 3-L/2016",
+      "year": 2016,
+      "text_snippet": "Waris Ali joined the police force..."
+    }
+  ]
+}
+```
+
+This `citations` list only includes passages the LLM **actually
+referenced** — not every passage retrieved (that's still in the
+separate `passages` list). This is what will let the eventual
+frontend show "Sources" specific to the claims actually made in the
+answer, rather than a generic dump of everything that was searched.
+
+**Deliberately defensive, not trusting the LLM's citation behavior
+blindly:** duplicate citations are deduplicated to first appearance;
+an out-of-range citation (the LLM citing `[7]` when only 5 passages
+existed) is silently skipped rather than crashing or fabricating a
+source for it. **Tested explicitly** with all four of these cases —
+normal citations, duplicates, out-of-range numbers, and an answer
+with no citations at all (the insufficient-evidence case) — against
+realistic passage data, plus one full mocked end-to-end run
+confirming the whole retrieve → answer → citation-extraction chain
+works together correctly.
 
 ## Notes
 

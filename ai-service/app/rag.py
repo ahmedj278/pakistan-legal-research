@@ -1,0 +1,81 @@
+"""
+Basic RAG pipeline (Module 5, Sessions 5.2-5.3).
+
+Wires together retrieval (Module 4's full pipeline: BM25 + semantic
+-> RRF -> rerank), the LLM (Session 5.1), and citation extraction
+(Session 5.3) into one function: take a question, retrieve relevant
+passages, ask the LLM to answer using ONLY those passages while
+citing which passage number supports each claim, then parse those
+citation markers into a structured, traceable source list.
+
+No hardened insufficient-evidence safeguards beyond the system
+prompt instruction yet — Session 5.5 tests and strengthens this.
+"""
+
+from app.reranked_search import reranked_search
+from app.llm import generate
+from app.citations import build_citations
+
+SYSTEM_PROMPT = (
+    "You are a legal research assistant for Pakistani court judgments. "
+    "Answer the user's question using ONLY the provided passages below. "
+    "Do not use any outside knowledge. "
+    "Cite your sources: whenever you state a fact or conclusion drawn "
+    "from a passage, include its number in square brackets immediately "
+    "after the claim, e.g. \"The court held that the appeal was allowed [2].\" "
+    "Use the passage numbers exactly as given (e.g. [1], [2]) — never cite "
+    "a passage number that was not provided to you. "
+    "If the passages do not contain enough information to answer the "
+    "question, say so plainly instead of guessing. Never invent a case "
+    "name, citation, or fact that is not explicitly present in the "
+    "passages. This is a research aid, not legal advice."
+)
+
+
+def build_context(passages: list) -> str:
+    """
+    Formats retrieved passages into a numbered block the LLM can
+    reference, each labeled with enough metadata to be traceable
+    back to its source document.
+    """
+    blocks = []
+    for i, p in enumerate(passages, start=1):
+        meta = p["metadata"]
+        label = (
+            f"[Passage {i}] "
+            f"Court: {meta.get('court_name', 'Unknown')} | "
+            f"Case: {meta.get('case_title') or meta.get('source_filename', 'Unknown')} | "
+            f"Year: {meta.get('year', 'Unknown')}"
+        )
+        blocks.append(f"{label}\n{p['text']}")
+    return "\n\n".join(blocks)
+
+
+def answer_question(query_text: str, n_passages: int = 5, filters: dict = None) -> dict:
+    passages = reranked_search(query_text, n_results=n_passages, filters=filters)
+
+    if not passages:
+        # No point calling the LLM at all here — nothing to ground an
+        # answer in, and every call costs real (if free-tier) quota.
+        return {
+            "query": query_text,
+            "answer": (
+                "I could not find any relevant passages in the corpus to "
+                "answer this question."
+            ),
+            "passages": [],
+            "citations": [],
+        }
+
+    context = build_context(passages)
+    prompt = f"Passages:\n\n{context}\n\nQuestion: {query_text}"
+
+    answer_text = generate(prompt, system=SYSTEM_PROMPT, max_tokens=1024)
+    citations = build_citations(answer_text, passages)
+
+    return {
+        "query": query_text,
+        "answer": answer_text,
+        "passages": passages,
+        "citations": citations,
+    }
