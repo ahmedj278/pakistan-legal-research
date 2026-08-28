@@ -53,25 +53,22 @@ def _generate_gemini(prompt: str, system: str, max_tokens: int) -> str:
 
     # Imported lazily, same reasoning as the Anthropic branch above.
     from google import genai
+    from google.genai import types
 
     client = genai.Client(api_key=settings.llm_api_key)
 
-    # NOTE: verified against Google's most recently published SDK
-    # docs at build time (not from training data, since this SDK has
-    # changed shape before), but Google's Python GenAI SDK is
-    # actively evolving — if this errors on your machine, check
-    # whatever `pip install google-genai` actually installed against
-    # its own quickstart example and adjust this function to match.
-    #
-    # This SDK version doesn't cleanly expose a separate system-vs-
-    # user-content split the way Anthropic's does, so system
-    # instructions are simply prepended to the prompt — a reliable
-    # fallback regardless of exact API shape.
-    combined_input = f"{system}\n\n{prompt}" if system else prompt
-
+    # NOTE: verified directly against the installed google-genai SDK
+    # (not assumed from memory or from an older comment in this file —
+    # this SDK has changed shape before). types.GenerateContentConfig
+    # exposes both system_instruction and max_output_tokens, so both
+    # are set properly here rather than working around their absence.
     response = client.models.generate_content(
         model=settings.llm_model_name,
-        contents=combined_input,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system or None,
+            max_output_tokens=max_tokens,
+        ),
     )
     return response.text
 
