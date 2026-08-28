@@ -6,4 +6,67 @@ body {
   margin: 0;
   background-color: #fafafa;
   color: #1a1a1a;
+  font-family: system-ui, sans-serif;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  border-bottom: 1px solid #e0e0e0;
+  background: #fff;
+}
+
+.app-header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.app-title {
+  font-weight: 600;
+}
+
+.app-nav {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+}
+
+.app-nav a {
+  color: #444;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.app-nav a.active {
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.backend-status {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.app-main {
+  flex: 1;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.app-footer {
+  text-align: center;
+  font-size: 0.8rem;
+  color: #888;
+  padding: 1rem;
+  border-top: 1px solid #e0e0e0;
 }

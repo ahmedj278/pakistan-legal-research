@@ -11,6 +11,9 @@ const cors = require("cors");
 const morgan = require("morgan");
 
 const healthRouter = require("./routes/health");
+const searchRouter = require("./routes/search");
+const askRouter = require("./routes/ask");
+const documentsRouter = require("./routes/documents");
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
 
 function createApp() {
@@ -27,6 +30,9 @@ function createApp() {
   app.use(express.json());
 
   app.use("/health", healthRouter);
+  app.use("/api/search", searchRouter);
+  app.use("/api/ask", askRouter);
+  app.use("/api/documents", documentsRouter);
 
   // Must come after all real routes: catches anything unmatched.
   app.use(notFoundHandler);

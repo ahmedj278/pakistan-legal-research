@@ -28,11 +28,19 @@ citing" — both produce zero citations — but flagging both for
 manual review is strictly better than silently treating an uncited
 answer as if it were fully sourced. Documented as a known
 limitation, not something worth more engineering time here.
+
+Session 6.3 (query routing): retrieval routes citation-lookup-shaped
+queries (e.g. "PLD 2024 SC 1276") to hybrid_search directly, skipping
+the reranker — see is_citation_lookup()'s docstring in
+app/query_processing.py for the documented failure (docs/retrieval-
+notes.md, Test 8) that justifies this specific, narrow routing rule.
 """
 
 from app.reranked_search import reranked_search
+from app.hybrid_search import hybrid_search
 from app.llm import generate
 from app.citations import build_citations
+from app.query_processing import is_citation_lookup
 
 SYSTEM_PROMPT = (
     "You are a legal research assistant for Pakistani court judgments. "
@@ -70,7 +78,14 @@ def build_context(passages: list) -> str:
 
 
 def answer_question(query_text: str, n_passages: int = 5, filters: dict = None) -> dict:
-    passages = reranked_search(query_text, n_results=n_passages, filters=filters)
+    # Session 6.3 routing: for a citation-shaped query, hybrid search's
+    # own ranking is the better-performing deterministic choice (see
+    # module docstring / is_citation_lookup()'s docstring for the
+    # measured evidence) — skip the reranker rather than trust it here.
+    if is_citation_lookup(query_text):
+        passages = hybrid_search(query_text, n_results=n_passages, filters=filters)
+    else:
+        passages = reranked_search(query_text, n_results=n_passages, filters=filters)
 
     if not passages:
         # No point calling the LLM at all here — nothing to ground an
