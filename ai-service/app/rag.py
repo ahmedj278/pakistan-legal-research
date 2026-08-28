@@ -28,12 +28,15 @@ citing" — both produce zero citations — but flagging both for
 manual review is strictly better than silently treating an uncited
 answer as if it were fully sourced. Documented as a known
 limitation, not something worth more engineering time here.
+<<<<<<< HEAD
 
 Session 6.3 (query routing): retrieval routes citation-lookup-shaped
 queries (e.g. "PLD 2024 SC 1276") to hybrid_search directly, skipping
 the reranker — see is_citation_lookup()'s docstring in
 app/query_processing.py for the documented failure (docs/retrieval-
 notes.md, Test 8) that justifies this specific, narrow routing rule.
+=======
+>>>>>>> d2f1582580f0e34ea1ad0f2bf58a30d88d897f9c
 """
 
 from app.reranked_search import reranked_search
