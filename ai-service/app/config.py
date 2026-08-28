@@ -49,6 +49,6 @@ class Settings:
     llm_provider: str = os.getenv("LLM_PROVIDER") or "gemini"
     llm_model_name: str = os.getenv("LLM_MODEL_NAME") or "gemini-2.5-flash"
     llm_api_key: str = os.getenv("LLM_API_KEY") or ""
-
+    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434"
 
 settings = Settings()

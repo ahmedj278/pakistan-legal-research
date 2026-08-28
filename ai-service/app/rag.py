@@ -1,5 +1,5 @@
 """
-Basic RAG pipeline (Module 5, Sessions 5.2-5.3).
+RAG pipeline (Module 5, Sessions 5.2-5.5).
 
 Wires together retrieval (Module 4's full pipeline: BM25 + semantic
 -> RRF -> rerank), the LLM (Session 5.1), and citation extraction
@@ -8,8 +8,26 @@ passages, ask the LLM to answer using ONLY those passages while
 citing which passage number supports each claim, then parse those
 citation markers into a structured, traceable source list.
 
-No hardened insufficient-evidence safeguards beyond the system
-prompt instruction yet — Session 5.5 tests and strengthens this.
+Session 5.4 (grounded answer generation): reviewed and accepted as
+already satisfied by the SYSTEM_PROMPT below (ONLY-use-passages
+instruction + mandatory [N] citation format + explicit
+no-fabrication instruction). Not re-engineered further — this is a
+portfolio project, not a production legal system, and prompt-level
+grounding is a reasonable, documented scope boundary rather than a
+gap.
+
+Session 5.5 (hallucination / insufficient-evidence safeguards): the
+system prompt alone can't guarantee the LLM actually follows the
+citation instruction. This module can't verify claim-level
+correctness (that would need real NLI-style entailment checking,
+out of scope here) — so instead it adds one honest, deterministic
+signal: `grounded` is False whenever the LLM's answer contains zero
+citation markers. This can't distinguish "the LLM correctly said
+there wasn't enough evidence" from "the LLM answered anyway without
+citing" — both produce zero citations — but flagging both for
+manual review is strictly better than silently treating an uncited
+answer as if it were fully sourced. Documented as a known
+limitation, not something worth more engineering time here.
 """
 
 from app.reranked_search import reranked_search
@@ -65,6 +83,7 @@ def answer_question(query_text: str, n_passages: int = 5, filters: dict = None) 
             ),
             "passages": [],
             "citations": [],
+            "grounded": False,
         }
 
     context = build_context(passages)
@@ -73,9 +92,28 @@ def answer_question(query_text: str, n_passages: int = 5, filters: dict = None) 
     answer_text = generate(prompt, system=SYSTEM_PROMPT, max_tokens=1024)
     citations = build_citations(answer_text, passages)
 
-    return {
+    # Deterministic hallucination/insufficient-evidence signal (Session
+    # 5.5): passages were retrieved, but the LLM cited none of them in
+    # its answer. See module docstring for why this one flag covers
+    # both the "correctly declined" and "answered without grounding"
+    # cases rather than trying to tell them apart.
+    grounded = len(citations) > 0
+
+    result = {
         "query": query_text,
         "answer": answer_text,
         "passages": passages,
         "citations": citations,
+        "grounded": grounded,
     }
+
+    if not grounded:
+        result["warning"] = (
+            "The model's answer did not cite any of the retrieved "
+            "passages. This may mean it correctly identified "
+            "insufficient evidence to answer, or it may have answered "
+            "without proper grounding — review this answer manually "
+            "before relying on it."
+        )
+
+    return result
