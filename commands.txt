@@ -1,0 +1,40 @@
+1. Ollama (local LLM, if Gemini quota is out)
+
+bash
+ollama serve
+
+(skip this if the Ollama desktop app is already open in your tray)
+
+2. AI service (Python/FastAPI) — new terminal
+
+bash
+cd ai-service
+uvicorn app.main:app --reload --port 8000
+
+3. Backend (Node/Express) — new terminal
+
+bash
+cd backend
+npm run dev
+
+4. Frontend (React/Vite) — new terminal
+
+bash
+cd frontend
+npm run dev
+
+Order matters a bit: start AI service first, then backend, then frontend — each one depends on the one before it being up. Ollama only needs to be running before you make an actual LLM call, not necessarily first.
+
+Quick sanity checks, if something's not responding:
+
+bash
+curl http://localhost:8000/health   # AI service
+curl http://localhost:4000/health   # backend
+curl http://localhost:11434         # Ollama
+
+Frontend will be at http://localhost:5173 in your browser once all of the above are running.
+
+venv:
+
+cd ingestion
+source venv/Scripts/activate
