@@ -52,7 +52,11 @@ function ResultCard({ result }) {
 
       <p className="result-excerpt">{truncate(text)}</p>
 
-      <Link to={judgmentLink} className="result-link">
+      <Link
+        to={judgmentLink}
+        state={{ relevantText: text }}
+        className="result-link"
+      >
         View full judgment →
       </Link>
     </article>
