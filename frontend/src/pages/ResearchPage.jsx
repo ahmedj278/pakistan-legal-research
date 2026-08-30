@@ -1,12 +1,81 @@
-// The full research/RAG interface (generated answer, citations,
-// supporting judgments) lands here in Session 7.5. This stub exists
-// to prove routing/layout work correctly first.
+import { useState } from "react";
+import { ask } from "../api/client";
+import CitationCard from "../components/CitationCard";
 
 function ResearchPage() {
+  const [query, setQuery] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!query.trim()) return;
+
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const data = await ask({ query });
+      setResult(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <section>
       <h1>Research Mode</h1>
-      <p>Ask a legal research question and get a grounded, cited answer (Session 7.5).</p>
+      <p className="page-subtitle">
+        Ask a legal research question. The answer is generated from retrieved judgments and
+        cites its sources — always verify against the full judgment text before relying on it.
+      </p>
+
+      <form onSubmit={handleSubmit} className="search-form">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="e.g. Can a wife get maintenance after khula?"
+          aria-label="Research question"
+        />
+        <button type="submit" disabled={loading || !query.trim()}>
+          {loading ? "Thinking…" : "Ask"}
+        </button>
+      </form>
+
+      {error && <p className="search-error">{error}</p>}
+
+      {result && (
+        <div className="research-result">
+          <h2>Answer</h2>
+          <p className="research-answer">{result.answer}</p>
+
+          {/* Session 5.5's grounded flag surfaced directly to the user:
+              zero citations means either an honest "insufficient
+              evidence" decline or an uncited answer — either way, the
+              user should see this rather than trust an unsourced
+              answer silently. See app/rag.py's docstring for the full
+              reasoning on why this can't distinguish the two cases. */}
+          {result.grounded === false && result.warning && (
+            <div className="grounding-warning">{result.warning}</div>
+          )}
+
+          {result.citations && result.citations.length > 0 && (
+            <>
+              <h2>Sources</h2>
+              <div className="search-results">
+                {result.citations.map((citation) => (
+                  <CitationCard key={citation.chunk_id} citation={citation} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </section>
   );
 }

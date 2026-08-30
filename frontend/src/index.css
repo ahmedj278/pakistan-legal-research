@@ -211,3 +211,39 @@ body {
   border-top: 1px solid #e0e0e0;
   padding-top: 0.8rem;
 }
+
+.page-subtitle {
+  color: #666;
+  font-size: 0.95rem;
+  max-width: 640px;
+}
+
+.research-result {
+  margin-top: 1.5rem;
+}
+
+.research-answer {
+  line-height: 1.6;
+  font-size: 1.02rem;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  white-space: pre-wrap;
+}
+
+.grounding-warning {
+  background: #fdeaea;
+  border: 1px solid #f0b8b8;
+  color: #8a2222;
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin-top: 0.8rem;
+  font-size: 0.9rem;
+}
+
+.citation-number {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.85rem;
+}
