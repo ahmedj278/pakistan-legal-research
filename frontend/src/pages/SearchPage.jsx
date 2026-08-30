@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { search } from "../api/client";
 import ResultCard from "../components/ResultCard";
+import Spinner from "../components/Spinner";
 
 // Known court slugs, confirmed directly against
 // ingestion/src/config.py (not guessed) — update this list if a new
@@ -37,6 +38,11 @@ function SearchPage() {
 
     setLoading(true);
     setError(null);
+    // Cleared immediately, not just on error/success — otherwise a
+    // new search visibly shows the PREVIOUS search's stale results
+    // while the new one is still loading, which looks like the new
+    // search already finished when it hasn't.
+    setResults([]);
 
     try {
       const data = await search({
@@ -99,11 +105,19 @@ function SearchPage() {
         </div>
 
         <button type="submit" disabled={loading || !query.trim()}>
-          {loading ? "Searching…" : "Search"}
+          Search
         </button>
       </form>
 
+      {loading && <Spinner label="Searching…" />}
       {error && <p className="search-error">{error}</p>}
+
+      {!loading && !hasSearched && !error && (
+        <p className="empty-state">
+          Enter a query above to search Pakistani court judgments — try a topic
+          ("maintenance after khula") or a citation ("PLD 2024 SC 1276").
+        </p>
+      )}
 
       {!loading && hasSearched && !error && results.length === 0 && (
         <p>No results found. Try a different query or fewer filters.</p>

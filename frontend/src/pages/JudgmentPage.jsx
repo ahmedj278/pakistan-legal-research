@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, useLocation, Link } from "react-router-dom";
 import { getDocument } from "../api/client";
+import Spinner from "../components/Spinner";
 
 const FULL_TEXT_PREVIEW_LENGTH = 2000;
 
@@ -32,7 +33,7 @@ function JudgmentPage() {
       .finally(() => setLoading(false));
   }, [filename, court]);
 
-  if (loading) return <p>Loading judgment…</p>;
+  if (loading) return <Spinner label="Loading judgment…" />;
 
   if (error) {
     return (

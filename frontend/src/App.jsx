@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import SearchPage from "./pages/SearchPage";
 import ResearchPage from "./pages/ResearchPage";
 import JudgmentPage from "./pages/JudgmentPage";
+import NotFoundPage from "./pages/NotFoundPage";
 
 // App structure and routing (Session 7.1). Layout wraps every page
 // with the shared nav bar + backend status badge (see
@@ -16,6 +17,7 @@ function App() {
           <Route path="/" element={<SearchPage />} />
           <Route path="/research" element={<ResearchPage />} />
           <Route path="/judgment/:filename" element={<JudgmentPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

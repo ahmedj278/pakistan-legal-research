@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ask } from "../api/client";
 import CitationCard from "../components/CitationCard";
+import Spinner from "../components/Spinner";
 
 function ResearchPage() {
   const [query, setQuery] = useState("");
@@ -43,16 +44,21 @@ function ResearchPage() {
           aria-label="Research question"
         />
         <button type="submit" disabled={loading || !query.trim()}>
-          {loading ? "Thinking…" : "Ask"}
+          Ask
         </button>
       </form>
+
+      {/* RAG calls genuinely take several seconds (retrieval + a real
+          LLM call) — a bare spinner with no context reads as "stuck"
+          past a couple seconds, so this sets the expectation. */}
+      {loading && <Spinner label="Generating an answer… this can take up to 15-20 seconds." />}
 
       {error && <p className="search-error">{error}</p>}
 
       {result && (
         <div className="research-result">
           <h2>Answer</h2>
-          <p className="research-answer">{result.answer}</p>
+          <p className="research-answer">{result.answer || "No answer was generated."}</p>
 
           {/* Session 5.5's grounded flag surfaced directly to the user:
               zero citations means either an honest "insufficient
