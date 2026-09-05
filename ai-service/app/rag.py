@@ -28,15 +28,12 @@ citing" — both produce zero citations — but flagging both for
 manual review is strictly better than silently treating an uncited
 answer as if it were fully sourced. Documented as a known
 limitation, not something worth more engineering time here.
-<<<<<<< HEAD
 
 Session 6.3 (query routing): retrieval routes citation-lookup-shaped
 queries (e.g. "PLD 2024 SC 1276") to hybrid_search directly, skipping
 the reranker — see is_citation_lookup()'s docstring in
 app/query_processing.py for the documented failure (docs/retrieval-
 notes.md, Test 8) that justifies this specific, narrow routing rule.
-=======
->>>>>>> d2f1582580f0e34ea1ad0f2bf58a30d88d897f9c
 """
 
 from app.reranked_search import reranked_search
@@ -44,6 +41,10 @@ from app.hybrid_search import hybrid_search
 from app.llm import generate
 from app.citations import build_citations
 from app.query_processing import is_citation_lookup
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "You are a legal research assistant for Pakistani court judgments. "
@@ -126,6 +127,7 @@ def answer_question(query_text: str, n_passages: int = 5, filters: dict = None) 
     }
 
     if not grounded:
+        logger.warning(f"Ungrounded answer for query={query_text!r} (zero citations)")
         result["warning"] = (
             "The model's answer did not cite any of the retrieved "
             "passages. This may mean it correctly identified "
